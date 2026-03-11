@@ -1,0 +1,9 @@
+{
+  "clientId": "example-client",
+  "clientName": "Example Pharmacy",
+  "github": {
+    "owner": "your-org",
+    "repo": "example-client-releases",
+    "private": true
+  }
+}

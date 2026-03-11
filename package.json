@@ -1,0 +1,39 @@
+{
+  "name": "zota-desktop",
+  "version": "1.0.0",
+  "description": "Zota CPOS Desktop Application",
+  "main": "dist/main/main/index.js",
+  "scripts": {
+    "build:main": "tsc --project tsconfig.main.json",
+    "build:preload": "esbuild src/main/preload.ts --bundle --outfile=dist/main/main/preload.js --platform=node --target=node18 --external:electron",
+    "build:renderer": "esbuild src/renderer/index.tsx --bundle --outfile=dist/renderer/index.js --platform=browser --target=chrome108 --loader:.tsx=tsx --loader:.ts=ts && esbuild src/renderer/update-entry.tsx --bundle --outfile=dist/renderer/update.js --platform=browser --target=chrome108 --loader:.tsx=tsx --loader:.ts=ts",
+    "build": "npm run build:main && npm run build:preload && npm run build:renderer && npm run copy-assets",
+    "copy-assets": "shx cp src/renderer/index.html dist/renderer/ && shx cp src/renderer/update.html dist/renderer/ && shx cp src/renderer/styles.css dist/renderer/",
+    "start": "npm run build && electron .",
+    "dev": "concurrently \"tsc --project tsconfig.main.json -w\" \"electron .\"",
+    "dist": "npm run build && electron-builder",
+    "dist:client": "node scripts/build-client.js",
+    "download-postgres": "node scripts/download-postgres.js",
+    "generate-activation": "ts-node scripts/generate-activation.ts"
+  },
+  "dependencies": {
+    "@zota/backend": "file:../zota-pos-backend-ts",
+    "electron-updater": "^6.1.7",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^20.10.5",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "concurrently": "^8.2.2",
+    "electron": "^24.0.0",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.19.10",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "shx": "^0.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

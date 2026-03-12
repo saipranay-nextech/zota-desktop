@@ -316,6 +316,15 @@ function setupMenu(): void {
     {
       label: 'File',
       submenu: [
+        {
+          label: 'Print',
+          accelerator: 'CommandOrControl+P',
+          click: () => {
+            const win = BrowserWindow.getFocusedWindow();
+            if (win) win.webContents.print();
+          },
+        },
+        { type: 'separator' },
         { role: 'quit' },
       ],
     },
@@ -471,5 +480,24 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.OPEN_UPDATE_WINDOW, () => {
     const updateWin = createUpdateWindow();
     updaterService.initialize(updateWin);
+  });
+
+  // Print handler — receives HTML from frontend and prints it
+  ipcMain.on('print-html', (_event, htmlString: string) => {
+    const printWindow = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
+
+    printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlString)}`);
+
+    printWindow.webContents.on('did-finish-load', () => {
+      printWindow.webContents.print({ silent: true }, (_success, _errorType) => {
+        printWindow.close();
+      });
+    });
   });
 }

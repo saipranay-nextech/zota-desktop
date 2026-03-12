@@ -53,7 +53,7 @@ export function createMainWindow(): BrowserWindow {
     },
   });
 
-  mainWindow.setMenuBarVisibility(false);
+  mainWindow.setMenuBarVisibility(true);
 
   const backendUrl = 'http://localhost:8000';
   let totalRetries = 0;

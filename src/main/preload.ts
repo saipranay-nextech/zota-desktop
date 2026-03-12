@@ -63,6 +63,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitApp: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.QUIT_APP),
 });
 
+// Expose window.electron.ipcRenderer for the frontend's print functionality
+contextBridge.exposeInMainWorld('electron', {
+  ipcRenderer: {
+    send: (channel: string, ...args: any[]) => {
+      const allowedChannels = ['print-html'];
+      if (allowedChannels.includes(channel)) {
+        ipcRenderer.send(channel, ...args);
+      }
+    },
+  },
+});
+
 // TypeScript declaration for renderer
 declare global {
   interface Window {

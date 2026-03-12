@@ -117,6 +117,8 @@ class BackendRunnerService {
           if (origin !== 'http://localhost:8000') {
             localStorage.setItem('localIP', window.location.hostname);
             window.__API_ORIGIN__ = origin;
+          } else {
+            localStorage.removeItem('localIP');
           }
         })();
       </script>`;

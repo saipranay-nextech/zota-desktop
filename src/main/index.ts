@@ -321,7 +321,7 @@ function setupMenu(): void {
           accelerator: 'CommandOrControl+P',
           click: () => {
             const win = BrowserWindow.getFocusedWindow();
-            if (win) win.webContents.print();
+            if (win) win.webContents.executeJavaScript('window.print()');
           },
         },
         { type: 'separator' },
@@ -485,6 +485,8 @@ function registerIpcHandlers(): void {
   // Print handler — receives HTML from frontend and prints it
   ipcMain.on('print-html', (_event, htmlString: string) => {
     const printWindow = new BrowserWindow({
+      width: 800,
+      height: 600,
       show: false,
       webPreferences: {
         nodeIntegration: false,
@@ -495,7 +497,11 @@ function registerIpcHandlers(): void {
     printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlString)}`);
 
     printWindow.webContents.on('did-finish-load', () => {
-      printWindow.webContents.print({ silent: true }, (_success, _errorType) => {
+      // Use Chromium's print dialog (with preview) instead of system dialog
+      printWindow.show();
+      printWindow.webContents.executeJavaScript('window.print()');
+      // Close window when print dialog is dismissed
+      printWindow.webContents.on('did-finish-load', () => {
         printWindow.close();
       });
     });

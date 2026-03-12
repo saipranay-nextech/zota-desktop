@@ -120,6 +120,19 @@ class BackendRunnerService {
           } else {
             localStorage.removeItem('localIP');
           }
+          // Sanitize: if localIP was set to "undefined" or empty by backend, remove it
+          var lip = localStorage.getItem('localIP');
+          if (!lip || lip === 'undefined' || lip === 'null' || lip === '') {
+            localStorage.removeItem('localIP');
+          }
+          // Patch Storage.setItem to prevent "undefined" from being stored as localIP
+          var origSetItem = Storage.prototype.setItem;
+          Storage.prototype.setItem = function(key, value) {
+            if (key === 'localIP' && (!value || value === 'undefined' || value === 'null')) {
+              return;
+            }
+            return origSetItem.call(this, key, value);
+          };
         })();
       </script>`;
       // This script runs after React bundle and patches axios baseURL

@@ -11,7 +11,8 @@
     "copy-assets": "shx cp src/renderer/index.html dist/renderer/ && shx cp src/renderer/update.html dist/renderer/ && shx cp src/renderer/styles.css dist/renderer/",
     "start": "npm run build && electron .",
     "dev": "concurrently \"tsc --project tsconfig.main.json -w\" \"electron .\"",
-    "dist": "npm run build && electron-builder",
+    "build:backend": "cd ../zota-pos-backend-ts && npm run build-main",
+    "dist": "npm run build:backend && npm run build && electron-builder",
     "dist:client": "node scripts/build-client.js",
     "download-postgres": "node scripts/download-postgres.js",
     "generate-activation": "ts-node scripts/generate-activation.ts"

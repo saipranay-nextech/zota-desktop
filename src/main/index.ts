@@ -79,6 +79,24 @@ async function quickLaunch(): Promise<void> {
     databaseSetupService.setPassword(config.pgPassword);
   }
 
+  // Wait for PostgreSQL to be ready (may still be starting after boot)
+  console.log('Waiting for PostgreSQL...');
+  let pgReady = false;
+  for (let i = 0; i < 15; i++) {
+    const conn = await databaseSetupService.testConnection();
+    if (conn.success) {
+      pgReady = true;
+      break;
+    }
+    console.log(`PostgreSQL not ready (attempt ${i + 1}/15), retrying...`);
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+
+  if (!pgReady) {
+    console.error('PostgreSQL not reachable after 30s');
+    throw new Error('PostgreSQL connection failed');
+  }
+
   // Set DB env vars
   process.env.DB_HOST = 'localhost';
   process.env.DB_USER = 'postgres';

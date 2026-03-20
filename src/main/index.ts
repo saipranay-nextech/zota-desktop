@@ -500,28 +500,52 @@ function registerIpcHandlers(): void {
     updaterService.initialize(updateWin);
   });
 
-  // Print handler — receives HTML from frontend and prints it
+  // Print handler — receives HTML from frontend, shows preview then prints
   ipcMain.on('print-html', (_event, htmlString: string) => {
+    const mainWin = getMainWindow();
     const printWindow = new BrowserWindow({
-      width: 800,
-      height: 600,
+      width: 900,
+      height: 700,
+      parent: mainWin || undefined,
+      modal: false,
       show: false,
+      title: 'Print Preview',
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
       },
     });
 
-    printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlString)}`);
+    printWindow.setMenuBarVisibility(false);
+
+    const previewHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Print Preview</title>' +
+      '<style>' +
+      '* { margin: 0; padding: 0; box-sizing: border-box; }' +
+      'body { background: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; }' +
+      '.toolbar { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: #1a1a2e; color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }' +
+      '.toolbar button { padding: 8px 20px; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; }' +
+      '.btn-print { background: #4CAF50; color: #fff; }' +
+      '.btn-print:hover { background: #45a049; }' +
+      '.btn-close { background: #f44336; color: #fff; }' +
+      '.btn-close:hover { background: #d32f2f; }' +
+      '.toolbar span { font-size: 14px; opacity: 0.8; margin-left: auto; }' +
+      '.preview-container { margin-top: 60px; padding: 20px; display: flex; justify-content: center; }' +
+      '.preview-page { background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.2); padding: 15mm; }' +
+      '@media print { .toolbar { display: none !important; } .preview-container { margin-top: 0; padding: 0; } .preview-page { box-shadow: none; padding: 0; } body { background: #fff; } }' +
+      '</style></head><body>' +
+      '<div class="toolbar">' +
+      '<button class="btn-print" onclick="window.print()">Print</button>' +
+      '<button class="btn-close" onclick="window.close()">Close</button>' +
+      '<span>Print Preview</span>' +
+      '</div>' +
+      '<div class="preview-container"><div class="preview-page">' +
+      htmlString +
+      '</div></div></body></html>';
+
+    printWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(previewHtml));
 
     printWindow.webContents.on('did-finish-load', () => {
-      // Use Chromium's print dialog (with preview) instead of system dialog
       printWindow.show();
-      printWindow.webContents.executeJavaScript('window.print()');
-      // Close window when print dialog is dismissed
-      printWindow.webContents.on('did-finish-load', () => {
-        printWindow.close();
-      });
     });
   });
 }

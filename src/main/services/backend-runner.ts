@@ -133,6 +133,33 @@ class BackendRunnerService {
             }
             return origSetItem.call(this, key, value);
           };
+          // Suppress native print dialog in Electron — printing is handled via IPC preview window
+          if (window.electron) {
+            window.print = function() {};
+            // Watch for dynamically created iframes and suppress their print() too
+            var observer = new MutationObserver(function(mutations) {
+              mutations.forEach(function(m) {
+                m.addedNodes.forEach(function(node) {
+                  if (node.tagName === 'IFRAME') {
+                    var attempts = 0;
+                    var iv = setInterval(function() {
+                      if (node.contentWindow) {
+                        node.contentWindow.print = function() {};
+                      }
+                      if (++attempts > 20) clearInterval(iv);
+                    }, 50);
+                  }
+                });
+              });
+            });
+            if (document.body) {
+              observer.observe(document.body, { childList: true, subtree: true });
+            } else {
+              document.addEventListener('DOMContentLoaded', function() {
+                observer.observe(document.body, { childList: true, subtree: true });
+              });
+            }
+          }
         })();
       </script>`;
       // This script runs after React bundle and patches axios baseURL

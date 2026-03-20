@@ -501,7 +501,26 @@ function registerIpcHandlers(): void {
   });
 
   // Print handler — receives HTML from frontend, shows preview then prints
-  ipcMain.on('print-html', (_event, htmlString: string) => {
+  // Data can be: HTML string (thermal) or array of {html, code, copies} (A4 print)
+  ipcMain.on('print-html', (_event, data: any) => {
+    let htmlContent = '';
+    if (typeof data === 'string') {
+      htmlContent = data;
+    } else if (Array.isArray(data)) {
+      // A4 print: array of objects with .html property
+      htmlContent = data.map((item: any) => item?.html || '').join('<div style="page-break-after: always;"></div>');
+    } else if (data && typeof data === 'object' && data.html) {
+      htmlContent = data.html;
+    } else {
+      console.error('print-html: unexpected data type', typeof data);
+      return;
+    }
+
+    if (!htmlContent) {
+      console.error('print-html: no HTML content to print');
+      return;
+    }
+
     const mainWin = getMainWindow();
     const printWindow = new BrowserWindow({
       width: 900,
@@ -539,7 +558,7 @@ function registerIpcHandlers(): void {
       '<span>Print Preview</span>' +
       '</div>' +
       '<div class="preview-container"><div class="preview-page">' +
-      htmlString +
+      htmlContent +
       '</div></div></body></html>';
 
     printWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(previewHtml));

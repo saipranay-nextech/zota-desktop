@@ -76,7 +76,7 @@ class BackendRunnerService {
       } else {
         // __dirname is dist/main/main/services, walk up to zota-desktop/
         const desktopRoot = path.resolve(__dirname, '..', '..', '..', '..');
-        frontendPath = path.join(desktopRoot, '..', 'zota-react-frontend', 'build');
+        frontendPath = path.join(desktopRoot, '..', 'zota-pos', 'zota-react-frontend', 'build');
       }
 
       // Remove backend's catch-all "Page not found" middleware FIRST

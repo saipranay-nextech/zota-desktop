@@ -11,14 +11,14 @@
     "copy-assets": "shx cp src/renderer/index.html dist/renderer/ && shx cp src/renderer/update.html dist/renderer/ && shx cp src/renderer/styles.css dist/renderer/",
     "start": "npm run build && electron .",
     "dev": "concurrently \"tsc --project tsconfig.main.json -w\" \"electron .\"",
-    "build:backend": "cd ../zota-pos-backend-ts && npm run build-main",
+    "build:backend": "cd ../zota-pos/zota-pos-backend-ts && npm run build-main",
     "dist": "npm run build:backend && npm run build && electron-builder",
     "dist:client": "node scripts/build-client.js",
     "download-postgres": "node scripts/download-postgres.js",
     "generate-activation": "ts-node scripts/generate-activation.ts"
   },
   "dependencies": {
-    "@zota/backend": "file:../zota-pos-backend-ts",
+    "@zota/backend": "file:../zota-pos/zota-pos-backend-ts",
     "electron-updater": "^6.1.7",
     "fs-extra": "^11.2.0"
   },

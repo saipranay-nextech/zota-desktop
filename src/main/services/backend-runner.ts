@@ -1,5 +1,5 @@
 import * as path from 'path';
-import * as fs from 'fs';
+import { existsSync } from 'fs';
 import { app as electronApp } from 'electron';
 import { BACKEND_PORT, BACKEND_URL, DATABASE_NAME } from '../../shared/constants';
 import { databaseSetupService } from './database-setup';
@@ -84,7 +84,7 @@ class BackendRunnerService {
           path.join(desktopRoot, '..', 'zota-pos', 'zota-react-frontend', 'build'),
           path.join(desktopRoot, '..', 'zota-react-frontend', 'build'),
         ];
-        frontendPath = candidates.find(p => fs.existsSync(path.join(p, 'index.html'))) || candidates[0];
+        frontendPath = candidates.find(p => existsSync(path.join(p, 'index.html'))) || candidates[0];
       }
 
       // Remove backend's catch-all "Page not found" middleware FIRST

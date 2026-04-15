@@ -1,3 +1,4 @@
+console.log('[ZOTA] index.ts loading...');
 import { app, BrowserWindow, ipcMain, globalShortcut, Menu } from 'electron';
 import {
   createSetupWindow,
@@ -20,8 +21,10 @@ import { SetupProgress } from '../shared/types';
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
+  console.log('[ZOTA] Another instance is running, quitting.');
   app.quit();
 } else {
+  console.log('[ZOTA] Got single instance lock, starting app...');
   app.on('second-instance', () => {
     const mainWindow = getMainWindow();
     if (mainWindow) {
@@ -31,8 +34,9 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(async () => {
+    console.log('[ZOTA] App ready, starting...');
     registerIpcHandlers();
-    await startApp();
+    await startApp().catch(err => console.error('[ZOTA] startApp error:', err));
   });
 }
 

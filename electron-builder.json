@@ -28,7 +28,7 @@
   "asar": false,
   "extraResources": [
     {
-      "from": "../zota-react-frontend/build",
+      "from": "../zota-pos/zota-react-frontend/build",
       "to": "frontend"
     },
     {

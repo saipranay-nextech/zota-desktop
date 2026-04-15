@@ -67,7 +67,7 @@ export function createMainWindow(): BrowserWindow {
     }
     totalRetries++;
 
-    const url = isDev ? 'http://localhost:3000' : backendUrl;
+    const url = backendUrl;
 
     mainWindow.loadURL(url).catch(() => {
       if (isDev) {

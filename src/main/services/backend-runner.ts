@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 import { app as electronApp } from 'electron';
 import { BACKEND_PORT, BACKEND_URL, DATABASE_NAME } from '../../shared/constants';
 import { databaseSetupService } from './database-setup';
@@ -76,7 +77,14 @@ class BackendRunnerService {
       } else {
         // __dirname is dist/main/main/services, walk up to zota-desktop/
         const desktopRoot = path.resolve(__dirname, '..', '..', '..', '..');
-        frontendPath = path.join(desktopRoot, '..', 'zota-pos', 'zota-react-frontend', 'build');
+        // Try both possible layouts:
+        // 1. zota-desktop and zota-pos are siblings (e.g. monorepo root)
+        // 2. zota-desktop is inside zota-pos (legacy layout)
+        const candidates = [
+          path.join(desktopRoot, '..', 'zota-pos', 'zota-react-frontend', 'build'),
+          path.join(desktopRoot, '..', 'zota-react-frontend', 'build'),
+        ];
+        frontendPath = candidates.find(p => fs.existsSync(path.join(p, 'index.html'))) || candidates[0];
       }
 
       // Remove backend's catch-all "Page not found" middleware FIRST

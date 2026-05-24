@@ -151,6 +151,12 @@ jobs:
 
       - name: Install backend deps
         shell: bash
+        # legacy-peer-deps because the backend has joi@18 while
+        # express-joi-validation peers on joi@17 — npm 7+ blocks strict
+        # peer-dep violations by default. The combination has worked in
+        # practice for the project, so we accept the looser resolution.
+        env:
+          npm_config_legacy_peer_deps: 'true'
         run: |
           cd "${{ steps.cfg.outputs.backend_dir }}"
           npm run install-all

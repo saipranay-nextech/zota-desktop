@@ -49,6 +49,18 @@ test('rejects missing variant', () => {
   assert.throws(() => loadClientConfig(tempConfig(cfg)), /missing required field "variant"/i);
 });
 
+test('rejects missing clientId', () => {
+  const cfg = { ...validConfig };
+  delete cfg.clientId;
+  assert.throws(() => loadClientConfig(tempConfig(cfg)), /missing required field "clientId"/i);
+});
+
+test('rejects missing clientName', () => {
+  const cfg = { ...validConfig };
+  delete cfg.clientName;
+  assert.throws(() => loadClientConfig(tempConfig(cfg)), /missing required field "clientName"/i);
+});
+
 test('rejects invalid variant value', () => {
   assert.throws(
     () => loadClientConfig(tempConfig({ ...validConfig, variant: 'foo' })),

@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Zota CPOS Desktop Application",
   "main": "dist/main/main/index.js",
+  "engines": {
+    "node": ">=20.13"
+  },
   "scripts": {
     "build:main": "tsc --project tsconfig.main.json",
     "build:preload": "esbuild src/main/preload.ts --bundle --outfile=dist/main/main/preload.js --platform=node --target=node18 --external:electron",

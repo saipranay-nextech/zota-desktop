@@ -22,13 +22,10 @@
 const { execSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { loadClientConfig } = require('./lib/load-client-config');
+const { withTemporaryVersion } = require('./lib/temp-version');
 
 const ROOT = path.resolve(__dirname, '..');
-const command = process.argv[2];
-const variant = process.argv[3];
-// Optional --client flag for dist command: node scripts/zota.js dist pos --client clients/acme.json
-const clientFlag = process.argv.indexOf('--client');
-const clientConfigPath = clientFlag !== -1 ? process.argv[clientFlag + 1] : null;
 
 const VARIANTS = {
   pos: {
@@ -42,6 +39,34 @@ const VARIANTS = {
     appId: 'com.zota.cpos',
   },
 };
+
+const command = process.argv[2];
+let variant = process.argv[3];
+
+function flagValue(name) {
+  const idx = process.argv.indexOf(name);
+  return idx !== -1 ? process.argv[idx + 1] : null;
+}
+function flagPresent(name) {
+  return process.argv.includes(name);
+}
+
+const clientConfigPath = flagValue('--client');
+const versionOverride = flagValue('--version');
+const shouldPublish = flagPresent('--publish');
+const isCI = process.env.GITHUB_ACTIONS === 'true';
+
+// Resolve variant: positional arg wins; else fall back to client config (CI uses this).
+function resolveVariant() {
+  if (VARIANTS[variant]) return variant;
+  if (clientConfigPath) {
+    const cfg = loadClientConfig(clientConfigPath);
+    if (VARIANTS[cfg.variant]) return cfg.variant;
+  }
+  console.error(`\n  Error: variant must be "pos" or "cpos" (provide as positional arg or via --client config)\n`);
+  usage();
+  process.exit(1);
+}
 
 function usage() {
   console.log(`
@@ -78,9 +103,13 @@ function preflight(v) {
 
 function setVariantConfig(v) {
   const config = VARIANTS[v];
-  const backendDir = path.join(ROOT, 'sourcecode', config.backendDir);
+  let clientConfig = null;
+  if (clientConfigPath) {
+    clientConfig = loadClientConfig(clientConfigPath);
+    console.log(`  Client: ${clientConfig.clientName} (${clientConfig.clientId})`);
+  }
 
-  // Write a variant config file that backend-runner.ts reads at runtime
+  // Write variant.json that backend-runner.ts reads at runtime
   const variantConfig = {
     variant: v,
     appName: config.appName,
@@ -100,26 +129,11 @@ function setVariantConfig(v) {
   builder.productName = config.appName;
   builder.appId = config.appId;
   builder.extraResources = [
-    {
-      from: path.join('sourcecode', 'zota-react-frontend', 'build'),
-      to: 'frontend',
-    },
-    {
-      from: 'assets/schema.sql',
-      to: 'schema.sql',
-    },
+    { from: path.join('sourcecode', 'zota-react-frontend', 'build'), to: 'frontend' },
+    { from: 'assets/schema.sql', to: 'schema.sql' },
   ];
 
-  // If --client flag provided, set publish config from client config
-  if (clientConfigPath) {
-    const fullClientPath = path.resolve(clientConfigPath);
-    if (!fs.existsSync(fullClientPath)) {
-      console.error(`  Client config not found: ${fullClientPath}`);
-      process.exit(1);
-    }
-    const clientConfig = JSON.parse(fs.readFileSync(fullClientPath, 'utf8'));
-    console.log(`  Client: ${clientConfig.clientName} (${clientConfig.clientId})`);
-
+  if (clientConfig) {
     if (clientConfig.productName) {
       builder.productName = clientConfig.productName;
     }
@@ -152,7 +166,8 @@ function runElectron() {
 
 function buildMSI() {
   console.log('\n  Packaging installer...\n');
-  run('npx electron-builder');
+  const publishFlag = shouldPublish ? ' --publish always' : '';
+  run(`npx electron-builder${publishFlag}`);
   console.log('\n  Installer created in release/ folder\n');
 }
 
@@ -201,43 +216,57 @@ if (command === 'setup') {
   process.exit(0);
 }
 
-if (!variant || !VARIANTS[variant]) {
-  console.error(`\n  Error: variant must be "pos" or "cpos"\n`);
-  usage();
-  process.exit(1);
-}
+// Resolve variant once, used by all variant-aware commands
+const resolvedVariant = resolveVariant();
 
 // Ensure dist/ exists for variant.json
 fs.mkdirSync(path.join(ROOT, 'dist'), { recursive: true });
 
-switch (command) {
-  case 'check':
-    preflight(variant);
-    break;
+async function main() {
+  switch (command) {
+    case 'check':
+      preflight(resolvedVariant);
+      break;
 
-  case 'build':
-    preflight(variant);
-    setVariantConfig(variant);
-    buildDesktop();
-    console.log('\n  Build complete!\n');
-    break;
+    case 'build':
+      preflight(resolvedVariant);
+      setVariantConfig(resolvedVariant);
+      buildDesktop();
+      console.log('\n  Build complete!\n');
+      break;
 
-  case 'run':
-    preflight(variant);
-    setVariantConfig(variant);
-    buildDesktop();
-    runElectron();
-    break;
+    case 'run':
+      preflight(resolvedVariant);
+      setVariantConfig(resolvedVariant);
+      buildDesktop();
+      runElectron();
+      break;
 
-  case 'dist':
-    preflight(variant);
-    setVariantConfig(variant);
-    buildDesktop();
-    buildMSI();
-    break;
+    case 'dist': {
+      preflight(resolvedVariant);
+      setVariantConfig(resolvedVariant);
+      const runBuild = () => {
+        buildDesktop();
+        buildMSI();
+      };
+      if (versionOverride) {
+        await withTemporaryVersion(path.join(ROOT, 'package.json'), versionOverride, async () => {
+          runBuild();
+        });
+      } else {
+        runBuild();
+      }
+      break;
+    }
 
-  default:
-    console.error(`\n  Unknown command: ${command}\n`);
-    usage();
-    process.exit(1);
+    default:
+      console.error(`\n  Unknown command: ${command}\n`);
+      usage();
+      process.exit(1);
+  }
 }
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

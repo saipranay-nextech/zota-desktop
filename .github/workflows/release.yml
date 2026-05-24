@@ -163,6 +163,12 @@ jobs:
 
       - name: Build frontend
         shell: bash
+        # CI=false: Create React App turns ESLint warnings into errors when CI=true
+        # (GitHub Actions auto-sets it). The frontend has many pre-existing
+        # lint warnings; we don't want to gate releases on them.
+        env:
+          CI: 'false'
+          DISABLE_ESLINT_PLUGIN: 'true'
         run: |
           cd sourcecode/zota-react-frontend
           npm run build

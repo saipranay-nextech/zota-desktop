@@ -143,7 +143,11 @@ jobs:
           node-version: '20'
 
       - name: Install desktop deps
-        run: npm ci
+        # `npm install` (not `npm ci`) because @zota/backend is a file-dep on a
+        # submodule whose own package.json varies per client branch. `npm ci`
+        # would fail with "lockfile not in sync" since the desktop's lockfile
+        # was generated against a different backend branch.
+        run: npm install --no-audit --no-fund
 
       - name: Install backend deps
         shell: bash

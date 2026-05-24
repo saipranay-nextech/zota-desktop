@@ -1,0 +1,13 @@
+{
+  "clientId": "test",
+  "clientName": "Zota Test Client",
+  "productName": "Zota Test POS",
+  "variant": "pos",
+  "backendBranch": "REL-1.5",
+  "frontendBranch": "REL-1.5",
+  "github": {
+    "owner": "saipranay-nextech",
+    "repo": "zota-updates-test",
+    "private": true
+  }
+}

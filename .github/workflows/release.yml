@@ -82,19 +82,15 @@ jobs:
           echo "config_path=$CONFIG_PATH" >> "$GITHUB_OUTPUT"
           echo "Resolved: client=$CLIENT version=$VERSION config=$CONFIG_PATH"
 
-      - name: Mint GitHub App token
-        id: app_token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.ZOTA_BOT_APP_ID }}
-          private-key: ${{ secrets.ZOTA_BOT_PRIVATE_KEY }}
-          owner: Zota-NexTech-Limited
-
-      - name: Configure git to use app token via extraheader
+      - name: Configure git auth via PAT
         shell: bash
         env:
-          TOKEN: ${{ steps.app_token.outputs.token }}
+          TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::RELEASE_TOKEN secret is not set on this repository"
+            exit 1
+          fi
           # Rewrite SSH submodule URLs to HTTPS (no token in URL)
           git config --global url."https://github.com/".insteadOf "git@github.com-zota:"
           git config --global url."https://github.com/".insteadOf "git@github.com:"
@@ -169,7 +165,7 @@ jobs:
       - name: Run release (build + publish)
         shell: bash
         env:
-          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           VARIANT: ${{ steps.cfg.outputs.variant }}
           CONFIG_PATH: ${{ steps.inputs.outputs.config_path }}
           VERSION: ${{ steps.inputs.outputs.version }}

@@ -2,6 +2,7 @@ import { autoUpdater, UpdateInfo as ElectronUpdateInfo } from 'electron-updater'
 import { BrowserWindow } from 'electron';
 import { UpdateProgress, UpdateInfo } from '../../shared/types';
 import { IPC_CHANNELS } from '../../shared/constants';
+import { BUILD_TIME_UPDATE_TOKEN } from '../build-token';
 
 class UpdaterService {
   private targetWindow: BrowserWindow | null = null;
@@ -24,8 +25,11 @@ class UpdaterService {
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
 
-    // Set GH_TOKEN for private repos
-    const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+    // Auth for private update repos.
+    // Order: runtime env (dev/CI) > token baked into the build at release time.
+    // In packaged customer builds env is empty so the baked token is what's used.
+    const token =
+      process.env.GH_TOKEN || process.env.GITHUB_TOKEN || BUILD_TIME_UPDATE_TOKEN;
     if (token) {
       autoUpdater.requestHeaders = { Authorization: `token ${token}` };
     }

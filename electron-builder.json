@@ -57,7 +57,7 @@
   },
   "publish": {
     "provider": "github",
-    "owner": "saipranay-nextech",
+    "owner": "Zota-NexTech-Limited",
     "repo": "zota-updates-acme",
     "private": true
   }

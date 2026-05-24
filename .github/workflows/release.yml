@@ -1,0 +1,186 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*/v*'
+  workflow_dispatch:
+    inputs:
+      client:
+        description: 'Client name (must match clients/<name>.json without extension)'
+        required: true
+        type: string
+      version:
+        description: 'Version (e.g., 1.0.5)'
+        required: true
+        type: string
+      create_tag:
+        description: 'Also create and push the git tag <client>/v<version>'
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ github.event.inputs.client || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout zota-desktop (no submodules yet)
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Parse inputs (tag or dispatch)
+        id: inputs
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CLIENT="${{ github.event.inputs.client }}"
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Use the JS parser so the format is enforced in exactly one place
+            PARSED=$(node -e "
+              const { parseReleaseTag } = require('./scripts/lib/parse-tag');
+              const p = parseReleaseTag(process.argv[1]);
+              console.log(p.client + '|' + p.version);
+            " "${GITHUB_REF}")
+            CLIENT="${PARSED%%|*}"
+            VERSION="${PARSED##*|}"
+          fi
+          if [ -z "$CLIENT" ] || [ -z "$VERSION" ]; then
+            echo "::error::Could not parse client/version from tag or inputs"
+            exit 1
+          fi
+          # Find the client config file matching the parsed client name.
+          # Match by file basename, clientId field, or basename-contains.
+          CONFIG_PATH=$(node -e "
+            const fs = require('fs'), path = require('path');
+            const want = process.argv[1];
+            const files = fs.readdirSync('clients').filter(f => f.endsWith('.json'));
+            for (const f of files) {
+              const base = path.basename(f, '.json');
+              const cfg = JSON.parse(fs.readFileSync(path.join('clients', f), 'utf8'));
+              if (base === want || cfg.clientId === want || base.includes(want)) {
+                console.log(path.join('clients', f));
+                process.exit(0);
+              }
+            }
+            process.exit(2);
+          " "$CLIENT") || {
+            echo "::error::No client config found matching '$CLIENT' in clients/*.json"
+            exit 1
+          }
+          echo "client=$CLIENT" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "config_path=$CONFIG_PATH" >> "$GITHUB_OUTPUT"
+          echo "Resolved: client=$CLIENT version=$VERSION config=$CONFIG_PATH"
+
+      - name: Mint GitHub App token
+        id: app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.ZOTA_BOT_APP_ID }}
+          private-key: ${{ secrets.ZOTA_BOT_PRIVATE_KEY }}
+          owner: Zota-NexTech-Limited
+
+      - name: Rewrite submodule URLs to HTTPS with app token
+        shell: bash
+        run: |
+          TOKEN="${{ steps.app_token.outputs.token }}"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com-zota:"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
+
+      - name: Read variant + branches from client config
+        id: cfg
+        shell: bash
+        run: |
+          CONFIG="${{ steps.inputs.outputs.config_path }}"
+          VARIANT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$CONFIG','utf8')).variant)")
+          BACKEND_BRANCH=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$CONFIG','utf8')).backendBranch)")
+          FRONTEND_BRANCH=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$CONFIG','utf8')).frontendBranch)")
+          BACKEND_DIR="sourcecode/zota-${VARIANT}-backend-ts"
+          echo "variant=$VARIANT" >> "$GITHUB_OUTPUT"
+          echo "backend_branch=$BACKEND_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "frontend_branch=$FRONTEND_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "backend_dir=$BACKEND_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Init the right submodules at the right branches
+        shell: bash
+        run: |
+          # Only init the variant we need (skip the other backend variant)
+          git submodule update --init --depth 1 "${{ steps.cfg.outputs.backend_dir }}"
+          git submodule update --init --depth 1 sourcecode/zota-react-frontend
+
+          # Switch each to the client's branch
+          ( cd "${{ steps.cfg.outputs.backend_dir }}" && git fetch origin "${{ steps.cfg.outputs.backend_branch }}" --depth 1 && git checkout "${{ steps.cfg.outputs.backend_branch }}" )
+          ( cd sourcecode/zota-react-frontend && git fetch origin "${{ steps.cfg.outputs.frontend_branch }}" --depth 1 && git checkout "${{ steps.cfg.outputs.frontend_branch }}" )
+
+          # Init nested submodules (backend admin settings)
+          ( cd "${{ steps.cfg.outputs.backend_dir }}" && git submodule update --init --recursive --depth 1 )
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install desktop deps
+        run: npm ci
+
+      - name: Install backend deps
+        shell: bash
+        run: |
+          cd "${{ steps.cfg.outputs.backend_dir }}"
+          npm run install-all
+
+      - name: Install frontend deps
+        shell: bash
+        run: |
+          cd sourcecode/zota-react-frontend
+          npm install
+
+      - name: Build frontend
+        shell: bash
+        run: |
+          cd sourcecode/zota-react-frontend
+          npm run build
+
+      - name: Build backend
+        shell: bash
+        run: |
+          cd "${{ steps.cfg.outputs.backend_dir }}"
+          npm run build-main
+
+      - name: Run release (build + publish)
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+        run: node scripts/zota.js dist ${{ steps.cfg.outputs.variant }} --client ${{ steps.inputs.outputs.config_path }} --version ${{ steps.inputs.outputs.version }} --publish
+
+      - name: Tag the commit (if dispatch requested it)
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.create_tag == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+        run: |
+          TAG="${{ steps.inputs.outputs.client }}/v${{ steps.inputs.outputs.version }}"
+          git config user.name "zota-release-bot"
+          git config user.email "release-bot@zota.local"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "### Release Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Client: \`${{ steps.inputs.outputs.client }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Version: \`${{ steps.inputs.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Variant: \`${{ steps.cfg.outputs.variant }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Backend branch: \`${{ steps.cfg.outputs.backend_branch }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Frontend branch: \`${{ steps.cfg.outputs.frontend_branch }}\`" >> "$GITHUB_STEP_SUMMARY"

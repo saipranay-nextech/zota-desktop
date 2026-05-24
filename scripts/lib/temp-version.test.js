@@ -53,3 +53,23 @@ test('rejects empty version string', async () => {
   );
   assert.equal(readVersion(pkgPath), '1.0.0');
 });
+
+test('rejects package.json without a version field', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zota-pkg-'));
+  const filePath = path.join(dir, 'package.json');
+  fs.writeFileSync(filePath, JSON.stringify({ name: 'test' }, null, 2) + '\n');
+  await assert.rejects(
+    withTemporaryVersion(filePath, '1.0.0', async () => {}),
+    /has no version field/i
+  );
+});
+
+test('restores original raw bytes (preserves formatting and extra fields)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zota-pkg-'));
+  const filePath = path.join(dir, 'package.json');
+  // Original has unusual key order and trailing newline
+  const original = '{\n  "version": "1.0.0",\n  "name": "test",\n  "extra": true\n}\n';
+  fs.writeFileSync(filePath, original);
+  await withTemporaryVersion(filePath, '1.0.5', async () => {});
+  assert.equal(fs.readFileSync(filePath, 'utf8'), original);
+});

@@ -143,6 +143,14 @@ async function main() {
   }
 
   console.log(`\n  ${failures.length} issue(s) found.`);
+
+  // In CI, never prompt — fail fast so the build step that should have prepared
+  // these prerequisites can be identified and fixed in the workflow.
+  if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
+    console.error('  Refusing to auto-fix in CI. Each prerequisite should be set up in a dedicated workflow step.');
+    process.exit(1);
+  }
+
   const answer = await prompt('  Fix now? (Y/n): ');
 
   if (answer === 'n' || answer === 'no') {

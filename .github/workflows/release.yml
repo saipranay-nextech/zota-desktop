@@ -99,7 +99,7 @@ jobs:
           git config --global url."https://github.com/".insteadOf "git@github.com-zota:"
           git config --global url."https://github.com/".insteadOf "git@github.com:"
           # Token travels as an Authorization header, not in URLs or config files
-          AUTH="Authorization: Basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0 2>/dev/null || printf 'x-access-token:%s' "$TOKEN" | base64)"
+          AUTH="Authorization: Basic $(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')"
           git config --global "http.https://github.com/.extraheader" "$AUTH"
 
       - name: Read variant + branches from client config
@@ -118,17 +118,21 @@ jobs:
 
       - name: Init the right submodules at the right branches
         shell: bash
+        env:
+          BACKEND_DIR: ${{ steps.cfg.outputs.backend_dir }}
+          BACKEND_BRANCH: ${{ steps.cfg.outputs.backend_branch }}
+          FRONTEND_BRANCH: ${{ steps.cfg.outputs.frontend_branch }}
         run: |
           # Only init the variant we need (skip the other backend variant)
-          git submodule update --init --depth 1 "${{ steps.cfg.outputs.backend_dir }}"
+          git submodule update --init --depth 1 "$BACKEND_DIR"
           git submodule update --init --depth 1 sourcecode/zota-react-frontend
 
           # Switch each to the client's branch
-          ( cd "${{ steps.cfg.outputs.backend_dir }}" && git fetch origin "${{ steps.cfg.outputs.backend_branch }}" --depth 1 && git checkout "${{ steps.cfg.outputs.backend_branch }}" )
-          ( cd sourcecode/zota-react-frontend && git fetch origin "${{ steps.cfg.outputs.frontend_branch }}" --depth 1 && git checkout "${{ steps.cfg.outputs.frontend_branch }}" )
+          ( cd "$BACKEND_DIR" && git fetch origin "$BACKEND_BRANCH" --depth 1 && git checkout "$BACKEND_BRANCH" )
+          ( cd sourcecode/zota-react-frontend && git fetch origin "$FRONTEND_BRANCH" --depth 1 && git checkout "$FRONTEND_BRANCH" )
 
           # Init nested submodules (backend admin settings)
-          ( cd "${{ steps.cfg.outputs.backend_dir }}" && git submodule update --init --recursive --depth 1 )
+          ( cd "$BACKEND_DIR" && git submodule update --init --recursive --depth 1 )
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

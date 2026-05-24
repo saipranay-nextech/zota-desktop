@@ -1,8 +1,11 @@
 {
   "clientId": "acme-001",
   "clientName": "ACME Pharmacy",
+  "variant": "pos",
+  "backendBranch": "client-acme",
+  "frontendBranch": "client-acme",
   "github": {
-    "owner": "saipranay-nextech",
+    "owner": "Zota-NexTech-Limited",
     "repo": "zota-updates-acme",
     "private": true
   }

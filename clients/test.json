@@ -4,7 +4,7 @@
   "productName": "Zota Test POS",
   "variant": "pos",
   "backendBranch": "pranay/installer",
-  "frontendBranch": "Pranay/installer/28022026",
+  "frontendBranch": "pranay/installer/28022026",
   "github": {
     "owner": "saipranay-nextech",
     "repo": "zota-updates-test",

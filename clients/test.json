@@ -3,8 +3,8 @@
   "clientName": "Zota Test Client",
   "productName": "Zota Test POS",
   "variant": "pos",
-  "backendBranch": "REL-1.5",
-  "frontendBranch": "REL-1.5",
+  "backendBranch": "pranay/installer",
+  "frontendBranch": "Pranay/installer/28022026",
   "github": {
     "owner": "saipranay-nextech",
     "repo": "zota-updates-test",

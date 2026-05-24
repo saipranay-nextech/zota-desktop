@@ -91,9 +91,11 @@ jobs:
             echo "::error::RELEASE_TOKEN secret is not set on this repository"
             exit 1
           fi
-          # Rewrite SSH submodule URLs to HTTPS (no token in URL)
-          git config --global url."https://github.com/".insteadOf "git@github.com-zota:"
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          # Rewrite SSH submodule URLs to HTTPS (no token in URL).
+          # Use --add because url.X.insteadOf is multi-value — without --add the
+          # second call overwrites the first instead of appending.
+          git config --global --add url."https://github.com/".insteadOf "git@github.com-zota:"
+          git config --global --add url."https://github.com/".insteadOf "git@github.com:"
           # Token travels as an Authorization header, not in URLs or config files
           AUTH="Authorization: Basic $(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')"
           git config --global "http.https://github.com/.extraheader" "$AUTH"

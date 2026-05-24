@@ -11,6 +11,7 @@
     "copy-assets": "shx cp src/renderer/index.html dist/renderer/ && shx cp src/renderer/update.html dist/renderer/ && shx cp src/renderer/styles.css dist/renderer/",
     "start": "npm run build && electron .",
     "dev": "concurrently \"tsc --project tsconfig.main.json -w\" \"electron .\"",
+    "test": "node --test \"scripts/lib/**/*.test.js\"",
 
     "pos": "node scripts/zota.js run pos",
     "cpos": "node scripts/zota.js run cpos",

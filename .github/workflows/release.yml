@@ -181,14 +181,21 @@ jobs:
 
       - name: Build backend
         shell: bash
-        # TEMPORARY: `|| true` ignores tsc exit code so pre-existing TS errors on
-        # client branches don't block release builds. tsc still emits the .js
-        # output for files that compile. The bundled app may crash at runtime
-        # on code paths that hit the broken compilation. Remove `|| true` once
-        # the backend builds cleanly on every client branch.
+        # TEMPORARY: `|| echo` ignores tsc exit code so pre-existing TS errors on
+        # client branches don't block release builds. tsc still emits .js output
+        # for files that compile. The defensive copy below ensures hand-written
+        # JS in src/migrations/ ends up in dist/migrations/ even if the chained
+        # copy step inside `build-main` didn't reach. Remove the `|| echo` once
+        # client branches compile cleanly.
         run: |
           cd "${{ steps.cfg.outputs.backend_dir }}"
           npm run build-main || echo "::warning::backend build had TypeScript errors; release will ship partial output"
+          # Defensive: copy non-TS migration JS files into dist/ even if the
+          # cpSync step inside build-main was skipped due to an earlier failure.
+          if [ -d src/migrations ]; then
+            mkdir -p dist/migrations
+            cp -v src/migrations/*.js dist/migrations/ 2>/dev/null || echo "no migration .js files to copy"
+          fi
 
       - name: Inject update read-token into build
         shell: bash

@@ -54,15 +54,21 @@ function flagPresent(name) {
 const clientConfigPath = flagValue('--client');
 const versionOverride = flagValue('--version');
 const shouldPublish = flagPresent('--publish');
-const isCI = process.env.GITHUB_ACTIONS === 'true';
+
+let _cachedClientConfig = undefined;
+function getClientConfig() {
+  if (!clientConfigPath) return null;
+  if (_cachedClientConfig === undefined) {
+    _cachedClientConfig = loadClientConfig(clientConfigPath);
+  }
+  return _cachedClientConfig;
+}
 
 // Resolve variant: positional arg wins; else fall back to client config (CI uses this).
 function resolveVariant() {
   if (VARIANTS[variant]) return variant;
-  if (clientConfigPath) {
-    const cfg = loadClientConfig(clientConfigPath);
-    if (VARIANTS[cfg.variant]) return cfg.variant;
-  }
+  const cfg = getClientConfig();
+  if (cfg && VARIANTS[cfg.variant]) return cfg.variant;
   console.error(`\n  Error: variant must be "pos" or "cpos" (provide as positional arg or via --client config)\n`);
   usage();
   process.exit(1);
@@ -77,16 +83,19 @@ function usage() {
   Commands:
     run <pos|cpos>                          Run the desktop app locally
     build <pos|cpos>                        Build the desktop app
-    dist <pos|cpos> [--client <config>]     Build + package MSI installer
+    dist <pos|cpos> [options]               Build + package MSI installer
     check <pos|cpos>                        Run preflight checks only
     setup                                   Initialize submodules + install all deps
 
   Options:
     --client <path>     Client config file for dist (sets publish repo, app name)
+    --version <x.y.z>   Override package.json version for the duration of the build (does not commit)
+    --publish           Publish the built MSI to the configured GitHub release repo
 
   Examples:
     node scripts/zota.js run pos
     node scripts/zota.js dist cpos --client clients/acme-pharmacy.json
+    node scripts/zota.js dist pos --client clients/acme-pharmacy.json --version 1.0.5 --publish
     node scripts/zota.js setup
   `);
 }
@@ -103,9 +112,8 @@ function preflight(v) {
 
 function setVariantConfig(v) {
   const config = VARIANTS[v];
-  let clientConfig = null;
-  if (clientConfigPath) {
-    clientConfig = loadClientConfig(clientConfigPath);
+  const clientConfig = getClientConfig();
+  if (clientConfig) {
     console.log(`  Client: ${clientConfig.clientName} (${clientConfig.clientId})`);
   }
 
@@ -250,7 +258,7 @@ async function main() {
         buildMSI();
       };
       if (versionOverride) {
-        await withTemporaryVersion(path.join(ROOT, 'package.json'), versionOverride, async () => {
+        await withTemporaryVersion(path.join(ROOT, 'package.json'), versionOverride, () => {
           runBuild();
         });
       } else {

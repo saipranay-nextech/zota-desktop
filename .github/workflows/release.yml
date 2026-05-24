@@ -190,12 +190,16 @@ jobs:
         run: |
           cd "${{ steps.cfg.outputs.backend_dir }}"
           npm run build-main || echo "::warning::backend build had TypeScript errors; release will ship partial output"
-          # Defensive: copy non-TS migration JS files into dist/ even if the
-          # cpSync step inside build-main was skipped due to an earlier failure.
-          if [ -d src/migrations ]; then
-            mkdir -p dist/migrations
-            cp -v src/migrations/*.js dist/migrations/ 2>/dev/null || echo "no migration .js files to copy"
-          fi
+          # Defensive: mirror every hand-written .js under src/ into the
+          # matching path under dist/. tsc only emits .ts files; plain .js
+          # files (migrations, util helpers, etc.) need a manual copy.
+          # build-main's chained cpSync only covers one specific file, and
+          # skips entirely when an earlier step fails.
+          find src -type f -name '*.js' -print0 | while IFS= read -r -d '' f; do
+            dest="dist${f#src}"
+            mkdir -p "$(dirname "$dest")"
+            cp -v "$f" "$dest"
+          done
 
       - name: Inject update read-token into build
         shell: bash

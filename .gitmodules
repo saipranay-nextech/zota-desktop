@@ -1,0 +1,9 @@
+[submodule "sourcecode/zota-pos-backend-ts"]
+	path = sourcecode/zota-pos-backend-ts
+	url = git@github.com-zota:Zota-NexTech-Limited/zota-pos-backend-ts.git
+[submodule "sourcecode/zota-cpos-backend-ts"]
+	path = sourcecode/zota-cpos-backend-ts
+	url = git@github.com-zota:Zota-NexTech-Limited/zota-cpos-backend-ts.git
+[submodule "sourcecode/zota-react-frontend"]
+	path = sourcecode/zota-react-frontend
+	url = git@github.com-zota:Zota-NexTech-Limited/zota-react-frontend.git

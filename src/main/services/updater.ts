@@ -4,26 +4,38 @@ import { UpdateProgress, UpdateInfo } from '../../shared/types';
 import { IPC_CHANNELS } from '../../shared/constants';
 
 class UpdaterService {
+  private targetWindow: BrowserWindow | null = null;
   private mainWindow: BrowserWindow | null = null;
   private updateInfo: UpdateInfo | null = null;
   private initialized = false;
+  private updateAvailable = false;
 
+  /**
+   * Initialize with the main window. Call once on app start.
+   */
   initialize(mainWindow: BrowserWindow): void {
     this.mainWindow = mainWindow;
+    this.targetWindow = mainWindow;
 
-    // Only register listeners once to prevent accumulation
     if (this.initialized) return;
     this.initialized = true;
 
-    // Configure auto-updater - manual only
+    // Manual download, auto-install on quit if already downloaded
     autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = false;
+    autoUpdater.autoInstallOnAppQuit = true;
+
+    // Set GH_TOKEN for private repos
+    const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+    if (token) {
+      autoUpdater.requestHeaders = { Authorization: `token ${token}` };
+    }
 
     autoUpdater.on('checking-for-update', () => {
       this.sendProgress({ status: 'checking', percent: 0 });
     });
 
     autoUpdater.on('update-available', (info: ElectronUpdateInfo) => {
+      this.updateAvailable = true;
       this.updateInfo = {
         version: info.version,
         releaseNotes:
@@ -68,6 +80,47 @@ class UpdaterService {
     });
   }
 
+  /**
+   * Set a different window to receive update progress events
+   * (e.g., the dedicated update window).
+   */
+  setTargetWindow(window: BrowserWindow): void {
+    this.targetWindow = window;
+  }
+
+  /**
+   * Reset target back to main window (e.g., when update window closes).
+   */
+  resetTargetWindow(): void {
+    this.targetWindow = this.mainWindow;
+  }
+
+  /**
+   * Silent check on startup — only opens update window if update is available.
+   */
+  async silentCheckForUpdates(): Promise<void> {
+    if (!this.mainWindow) return;
+
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      if (result?.updateInfo && result.updateInfo.version !== autoUpdater.currentVersion.version) {
+        // Update available — the 'update-available' event handler will fire
+        // and send progress to whatever window is currently targeted.
+        // The caller (index.ts) can open the update window if needed.
+      }
+    } catch (error: any) {
+      // Silent check — don't show errors to user
+      console.log('Silent update check failed:', error.message);
+    }
+  }
+
+  /**
+   * Returns true if an update was found during the last check.
+   */
+  isUpdateAvailable(): boolean {
+    return this.updateAvailable;
+  }
+
   async checkForUpdates(): Promise<void> {
     try {
       await autoUpdater.checkForUpdates();
@@ -97,8 +150,9 @@ class UpdaterService {
   }
 
   private sendProgress(progress: UpdateProgress): void {
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.webContents.send(IPC_CHANNELS.UPDATE_PROGRESS, progress);
+    const window = this.targetWindow || this.mainWindow;
+    if (window && !window.isDestroyed()) {
+      window.webContents.send(IPC_CHANNELS.UPDATE_PROGRESS, progress);
     }
   }
 }

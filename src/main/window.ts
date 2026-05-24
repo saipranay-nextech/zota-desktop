@@ -1,5 +1,6 @@
 import { app, BrowserWindow, screen } from 'electron';
 import * as path from 'path';
+import { getVariantConfig } from './utils/paths';
 
 const isDev = !app.isPackaged;
 
@@ -42,10 +43,13 @@ export function createSetupWindow(): BrowserWindow {
 export function createMainWindow(): BrowserWindow {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
+  const variantConfig = getVariantConfig();
+
   mainWindow = new BrowserWindow({
     width,
     height,
     show: false,
+    title: variantConfig.appName,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

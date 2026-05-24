@@ -1,9 +1,8 @@
 import * as path from 'path';
-import { existsSync } from 'fs';
 import { app as electronApp } from 'electron';
 import { BACKEND_PORT, BACKEND_URL, DATABASE_NAME } from '../../shared/constants';
 import { databaseSetupService } from './database-setup';
-import { getBackendPath } from '../utils/paths';
+import { getBackendPath, getFrontendPath, getVariantConfig } from '../utils/paths';
 
 // Use Function constructor to preserve dynamic import() in CommonJS output
 // TypeScript compiles import() to require() which can't load ES modules
@@ -69,23 +68,7 @@ class BackendRunnerService {
 
       // Serve frontend build through the backend's Express app
       // so the page has an HTTP origin (file:// breaks Razorpay, fetch, etc.)
-      // In packaged app: frontend is in extraResources/frontend
-      // In dev: find project root by looking for package.json up from __dirname
-      let frontendPath: string;
-      if (electronApp.isPackaged) {
-        frontendPath = path.join(process.resourcesPath, 'frontend');
-      } else {
-        // __dirname is dist/main/main/services, walk up to zota-desktop/
-        const desktopRoot = path.resolve(__dirname, '..', '..', '..', '..');
-        // Try both possible layouts:
-        // 1. zota-desktop and zota-pos are siblings (e.g. monorepo root)
-        // 2. zota-desktop is inside zota-pos (legacy layout)
-        const candidates = [
-          path.join(desktopRoot, '..', 'zota-pos', 'zota-react-frontend', 'build'),
-          path.join(desktopRoot, '..', 'zota-react-frontend', 'build'),
-        ];
-        frontendPath = candidates.find(p => existsSync(path.join(p, 'index.html'))) || candidates[0];
-      }
+      const frontendPath = getFrontendPath();
 
       // Remove backend's catch-all "Page not found" middleware FIRST
       // before registering any new routes/middleware
@@ -105,8 +88,15 @@ class BackendRunnerService {
         });
       });
 
-      // Resolve express from backend's node_modules (it's not hoisted to top level)
-      const backendDir = path.dirname(require.resolve('@zota/backend'));
+      // Resolve express from backend's node_modules
+      const variantConfig = getVariantConfig();
+      let backendDir: string;
+      if (electronApp.isPackaged) {
+        backendDir = path.dirname(require.resolve('@zota/backend'));
+      } else {
+        const desktopRoot = path.resolve(__dirname, '..', '..', '..', '..');
+        backendDir = path.join(desktopRoot, variantConfig.backendDir);
+      }
       const expressPath = require.resolve('express', { paths: [backendDir] });
       const express = require(expressPath);
       this.instance!.app.use(express.static(frontendPath));

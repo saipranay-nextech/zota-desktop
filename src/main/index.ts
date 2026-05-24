@@ -131,6 +131,14 @@ async function quickLaunch(): Promise<void> {
   const mainWindow = createMainWindow();
   updaterService.initialize(mainWindow);
   setupMenu();
+
+  // Silent update check after launch (non-blocking, no UI unless update found)
+  setTimeout(async () => {
+    await updaterService.silentCheckForUpdates();
+    if (updaterService.isUpdateAvailable()) {
+      openUpdateWindow();
+    }
+  }, 5000);
 }
 
 async function runSetup(setupWindow: BrowserWindow): Promise<void> {
@@ -329,6 +337,14 @@ async function continueSetupAfterPostgres(
   const mainWindow = createMainWindow();
   updaterService.initialize(mainWindow);
   setupMenu();
+
+  // Silent update check after first-time setup
+  setTimeout(async () => {
+    await updaterService.silentCheckForUpdates();
+    if (updaterService.isUpdateAvailable()) {
+      openUpdateWindow();
+    }
+  }, 5000);
 }
 
 function setupMenu(): void {
@@ -382,7 +398,12 @@ function setupMenu(): void {
 
 function openUpdateWindow(): void {
   const updateWin = createUpdateWindow();
-  updaterService.initialize(updateWin);
+  updaterService.setTargetWindow(updateWin);
+
+  // Reset target back to main window when update window closes
+  updateWin.on('closed', () => {
+    updaterService.resetTargetWindow();
+  });
 }
 
 function registerIpcHandlers(): void {
@@ -500,8 +521,7 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.OPEN_UPDATE_WINDOW, () => {
-    const updateWin = createUpdateWindow();
-    updaterService.initialize(updateWin);
+    openUpdateWindow();
   });
 
   // Print handler — receives HTML from frontend, shows preview then prints

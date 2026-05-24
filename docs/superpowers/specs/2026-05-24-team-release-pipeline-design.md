@@ -50,7 +50,7 @@ GitHub Actions workflow (.github/workflows/release.yml)
       ├─ Install deps, build backend + frontend + desktop
       ├─ Override package.json version with parsed version
       ├─ Run electron-builder --publish always
-      │     (GH_TOKEN scoped to the client's release repo only)
+      │     (GH_TOKEN from same App, write-scoped to client release repos)
       └─ Post release URL as workflow summary
       │
       ▼
@@ -149,12 +149,9 @@ Per-run, the workflow mints a token from the app and uses it for `git clone`/sub
 
 ### 5. Publish tokens per client release repo
 
-The release repos are owned by `saipranay-nextech` (personal account), not the org — the GitHub App on the org can't reach them. Two clean options:
+All client release repos live under the `Zota-NexTech-Limited` org, so the same GitHub App handles publishing. The App is granted Contents: Write on the release repos in addition to Contents: Read on the source repos. The minted app token is exposed as `GH_TOKEN` to the `electron-builder --publish always` step.
 
-- **Option A (recommended):** Move release repos under the `Zota-NexTech-Limited` org. Then the same GitHub App can hold Contents: Write on them. One token, one source of truth.
-- **Option B:** Keep release repos on personal account; store a machine-user PAT with `repo` scope as `ZOTA_RELEASE_TOKEN` secret. Used as `GH_TOKEN` during the publish step.
-
-Option A is the right long-term answer. Option B is acceptable interim if migrating repos isn't immediate.
+Any existing release repos currently on a personal account must be transferred to the org as part of rollout (or recreated under the org if transfer is impractical) before the pipeline can publish to them.
 
 ### 6. `docs/RELEASING.md`
 

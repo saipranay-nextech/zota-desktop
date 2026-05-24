@@ -125,9 +125,14 @@ jobs:
           git submodule update --init --depth 1 "$BACKEND_DIR"
           git submodule update --init --depth 1 sourcecode/zota-react-frontend
 
-          # Switch each to the client's branch
-          ( cd "$BACKEND_DIR" && git fetch origin "$BACKEND_BRANCH" --depth 1 && git checkout "$BACKEND_BRANCH" )
-          ( cd sourcecode/zota-react-frontend && git fetch origin "$FRONTEND_BRANCH" --depth 1 && git checkout "$FRONTEND_BRANCH" )
+          # Switch each to the client's branch.
+          # Explicit refspec creates origin/<branch> tracking ref; then -B makes a local branch.
+          ( cd "$BACKEND_DIR" \
+              && git fetch origin "$BACKEND_BRANCH:refs/remotes/origin/$BACKEND_BRANCH" --depth 1 \
+              && git checkout -B "$BACKEND_BRANCH" "origin/$BACKEND_BRANCH" )
+          ( cd sourcecode/zota-react-frontend \
+              && git fetch origin "$FRONTEND_BRANCH:refs/remotes/origin/$FRONTEND_BRANCH" --depth 1 \
+              && git checkout -B "$FRONTEND_BRANCH" "origin/$FRONTEND_BRANCH" )
 
           # Init nested submodules (backend admin settings)
           ( cd "$BACKEND_DIR" && git submodule update --init --recursive --depth 1 )

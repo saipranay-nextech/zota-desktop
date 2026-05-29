@@ -161,6 +161,17 @@ function buildBackend(v) {
   run(`node scripts/build-backend.js ${v}`);
 }
 
+function buildFrontend() {
+  // Wraps the React build so committed prod URLs in src/redux/config.js
+  // get rewritten to localhost for the duration of the build (and restored
+  // immediately after). Without this, installers ship with the cloud API
+  // URL baked into the bundle. Not in run/build because CRA rebuilds are
+  // slow and most local iteration doesn't touch the frontend; explicit
+  // `npm run build-frontend` covers that case.
+  console.log('\n  Building frontend (with local-backend config)...\n');
+  run('node scripts/build-frontend.js');
+}
+
 function buildDesktop() {
   console.log('\n  Building desktop app...\n');
   run('npm run build');
@@ -261,6 +272,7 @@ async function main() {
       preflight(resolvedVariant);
       setVariantConfig(resolvedVariant);
       const runBuild = () => {
+        buildFrontend();
         buildBackend(resolvedVariant);
         buildDesktop();
         buildMSI();

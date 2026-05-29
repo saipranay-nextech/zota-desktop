@@ -167,17 +167,16 @@ jobs:
           cd sourcecode/zota-react-frontend
           npm install
 
-      - name: Build frontend
+      - name: Build frontend (with local-backend config baked in)
         shell: bash
-        # CI=false: Create React App turns ESLint warnings into errors when CI=true
-        # (GitHub Actions auto-sets it). The frontend has many pre-existing
-        # lint warnings; we don't want to gate releases on them.
-        env:
-          CI: 'false'
-          DISABLE_ESLINT_PLUGIN: 'true'
-        run: |
-          cd sourcecode/zota-react-frontend
-          npm run build
+        # build-frontend.js snapshots src/redux/config.js, rewrites url /
+        # adminUrl / isAdmin to the local-backend values the desktop expects,
+        # runs `npm run build`, then restores the original file. Without
+        # this, installers shipped with the committed prod URL
+        # (https://admindev.nextechltd.in/api) baked into the bundle —
+        # every installed app would talk to production instead of its own
+        # bundled backend.
+        run: node scripts/build-frontend.js
 
       - name: Build backend
         shell: bash

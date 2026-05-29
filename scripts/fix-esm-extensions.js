@@ -58,13 +58,18 @@ const PATTERNS = [
   /(\bimport\s+)(["'])(\.{1,2}\/[^"']+)(["'])/g,
 ];
 
-// A path is "extensionless" if the last segment has no `.` after the final `/`.
-// Note: we intentionally treat ./foo.config or ./foo.v2 as already-extensioned
-// to avoid surprise rewrites of dotted names. tsc-emitted code never has bare
-// dotted relative imports without a real extension in the project so far.
-function hasExtension(spec) {
+// Only treat suffixes Node's ESM resolver actually recognizes as "already
+// extensioned." Treating any dot as an extension is wrong — `./db.config`
+// resolves to a file named `db.config.js` on disk, but a naive `.config`-is-
+// an-extension check would skip it and Node would then refuse the import.
+const NODE_ESM_EXTENSIONS = new Set(['js', 'mjs', 'cjs', 'json', 'node']);
+
+function hasResolvableExtension(spec) {
   const last = spec.split('/').pop() || '';
-  return last.includes('.');
+  const dotIdx = last.lastIndexOf('.');
+  if (dotIdx <= 0) return false; // no dot, or leading-dot (hidden file)
+  const ext = last.slice(dotIdx + 1).toLowerCase();
+  return NODE_ESM_EXTENSIONS.has(ext);
 }
 
 function resolveExtension(fileDir, spec) {
@@ -86,7 +91,7 @@ for (const file of walk(distDir)) {
   let updated = original;
   for (const pattern of PATTERNS) {
     updated = updated.replace(pattern, (match, prefix, openQuote, spec, closeQuote) => {
-      if (hasExtension(spec)) return match;
+      if (hasResolvableExtension(spec)) return match;
       const fixed = resolveExtension(fileDir, spec);
       if (!fixed) {
         unresolved.push({ file: path.relative(distDir, file), spec });

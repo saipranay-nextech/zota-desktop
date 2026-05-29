@@ -150,6 +150,11 @@ function setVariantConfig(v) {
       owner: clientConfig.github.owner,
       repo: clientConfig.github.repo,
       private: clientConfig.github.private !== false,
+      // Default electron-builder behavior is to publish drafts, which
+      // auto-updater ignores and end users can't download. Customers must
+      // see real releases the moment CI publishes them — no manual
+      // "publish from draft" step.
+      releaseType: 'release',
     };
   }
 

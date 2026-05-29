@@ -184,9 +184,33 @@ class BackendRunnerService {
           }, 50);
         })();
       </script>`;
+      // Small fixed-position badge so testers can see at a glance which
+      // version they're running. Pulls from electronApp.getVersion(),
+      // which reads package.json — that's set per-build by the CI release
+      // workflow via zota.js's --version flag.
+      const appVersion = electronApp.getVersion();
+      const versionBadgeScript = `<script>
+        (function() {
+          function mount() {
+            if (document.getElementById('zota-version-badge')) return;
+            var el = document.createElement('div');
+            el.id = 'zota-version-badge';
+            el.textContent = 'v${appVersion}';
+            el.style.cssText =
+              'position:fixed;bottom:8px;right:8px;z-index:2147483647;' +
+              'background:rgba(0,0,0,0.65);color:#fff;font:11px/1 monospace;' +
+              'padding:3px 7px;border-radius:4px;letter-spacing:0.5px;' +
+              'pointer-events:none;user-select:none;';
+            document.body.appendChild(el);
+          }
+          if (document.body) mount();
+          else document.addEventListener('DOMContentLoaded', mount);
+        })();
+      </script>`;
+
       const patchedHtml = indexHtml
         .replace('<head>', '<head>' + lanPatchScript)
-        .replace('</body>', axiosPatchScript + '</body>');
+        .replace('</body>', axiosPatchScript + versionBadgeScript + '</body>');
 
       this.instance!.app.get('*', (req: any, res: any) => {
         if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/')) {

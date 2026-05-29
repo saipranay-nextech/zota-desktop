@@ -39,7 +39,7 @@
   "win": {
     "target": [
       {
-        "target": "msi",
+        "target": "nsis",
         "arch": [
           "x64"
         ]
@@ -49,11 +49,15 @@
     "requestedExecutionLevel": "asInvoker"
   },
   "compression": "normal",
-  "msi": {
+  "nsis": {
     "perMachine": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "runAfterFinish": true
+    "runAfterFinish": true,
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "allowElevation": true,
+    "differentialPackage": true
   },
   "publish": {
     "provider": "github",

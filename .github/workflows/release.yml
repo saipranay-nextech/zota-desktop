@@ -230,15 +230,21 @@ jobs:
       - name: Tag the commit (if dispatch requested it)
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.create_tag == 'true' }}
         shell: bash
+        # Use the GitHub API to create the tag ref rather than `git push`.
+        # The git push path 400s on Windows runners because the global
+        # extraheader auth and the local repo's checkout-time auth fight
+        # each other. The API call only needs GH_TOKEN and is portable.
         env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           CLIENT: ${{ steps.inputs.outputs.client }}
           VERSION: ${{ steps.inputs.outputs.version }}
+          SHA: ${{ github.sha }}
         run: |
           TAG="${CLIENT}/v${VERSION}"
-          git config user.name "zota-release-bot"
-          git config user.email "release-bot@zota.local"
-          git tag "$TAG"
-          git push origin "$TAG"
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/tags/${TAG}" \
+            -f sha="${SHA}" \
+            || echo "::warning::Tag ${TAG} could not be created (likely already exists)"
 
       - name: Summary
         if: always()

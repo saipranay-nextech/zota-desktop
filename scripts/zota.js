@@ -156,6 +156,11 @@ function setVariantConfig(v) {
   fs.writeFileSync(builderPath, JSON.stringify(builder, null, 2) + '\n');
 }
 
+function buildBackend(v) {
+  console.log(`\n  Building backend (${v})...\n`);
+  run(`node scripts/build-backend.js ${v}`);
+}
+
 function buildDesktop() {
   console.log('\n  Building desktop app...\n');
   run('npm run build');
@@ -239,6 +244,7 @@ async function main() {
     case 'build':
       preflight(resolvedVariant);
       setVariantConfig(resolvedVariant);
+      buildBackend(resolvedVariant);
       buildDesktop();
       console.log('\n  Build complete!\n');
       break;
@@ -246,6 +252,7 @@ async function main() {
     case 'run':
       preflight(resolvedVariant);
       setVariantConfig(resolvedVariant);
+      buildBackend(resolvedVariant);
       buildDesktop();
       runElectron();
       break;
@@ -254,6 +261,7 @@ async function main() {
       preflight(resolvedVariant);
       setVariantConfig(resolvedVariant);
       const runBuild = () => {
+        buildBackend(resolvedVariant);
         buildDesktop();
         buildMSI();
       };

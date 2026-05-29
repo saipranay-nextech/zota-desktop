@@ -15,6 +15,10 @@
     "start": "npm run build && electron .",
     "dev": "concurrently \"tsc --project tsconfig.main.json -w\" \"electron .\"",
     "test": "node --test \"scripts/lib/**/*.test.js\"",
+    "smoke:pos": "node scripts/smoke-test-backend.js pos",
+    "smoke:cpos": "node scripts/smoke-test-backend.js cpos",
+    "build-backend:pos": "node scripts/build-backend.js pos",
+    "build-backend:cpos": "node scripts/build-backend.js cpos",
 
     "pos": "node scripts/zota.js run pos",
     "cpos": "node scripts/zota.js run cpos",

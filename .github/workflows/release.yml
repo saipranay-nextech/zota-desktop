@@ -181,25 +181,28 @@ jobs:
 
       - name: Build backend
         shell: bash
-        # TEMPORARY: `|| echo` ignores tsc exit code so pre-existing TS errors on
-        # client branches don't block release builds. tsc still emits .js output
-        # for files that compile. The defensive copy below ensures hand-written
-        # JS in src/migrations/ ends up in dist/migrations/ even if the chained
-        # copy step inside `build-main` didn't reach. Remove the `|| echo` once
-        # client branches compile cleanly.
-        run: |
-          cd "${{ steps.cfg.outputs.backend_dir }}"
-          npm run build-main || echo "::warning::backend build had TypeScript errors; release will ship partial output"
-          # Defensive: mirror every hand-written .js under src/ into the
-          # matching path under dist/. tsc only emits .ts files; plain .js
-          # files (migrations, util helpers, etc.) need a manual copy.
-          # build-main's chained cpSync only covers one specific file, and
-          # skips entirely when an earlier step fails.
-          find src -type f -name '*.js' -print0 | while IFS= read -r -d '' f; do
-            dest="dist${f#src}"
-            mkdir -p "$(dirname "$dest")"
-            cp -v "$f" "$dest"
-          done
+        # build-backend.js wraps three steps in the right order:
+        #   1. tsc (tolerates non-zero exit so legacy TS errors on client
+        #      branches don't block a release)
+        #   2. mirror every hand-written src/**/*.js into the matching path
+        #      under dist/ (tsc skips plain .js without allowJs)
+        #   3. add .js extensions to extensionless relative imports/exports
+        #      in dist/ (Node ESM is strict; tsc 5.3 + module: ESNext does
+        #      not rewrite them, and the backend's existing fix-esm-imports
+        #      script runs BEFORE the .js mirror so it misses migration
+        #      imports — see scripts/fix-esm-extensions.js for the full why)
+        env:
+          VARIANT: ${{ steps.cfg.outputs.variant }}
+        run: node scripts/build-backend.js "$VARIANT"
+
+      - name: Smoke-test backend imports
+        shell: bash
+        # Boots dist/server.js with junk env, listens for ERR_MODULE_NOT_FOUND.
+        # If the import chain resolves cleanly, the test passes — DB / port
+        # failures past that point are expected and don't fail the build.
+        env:
+          VARIANT: ${{ steps.cfg.outputs.variant }}
+        run: node scripts/smoke-test-backend.js "$VARIANT"
 
       - name: Inject update read-token into build
         shell: bash

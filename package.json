@@ -19,6 +19,9 @@
     "smoke:cpos": "node scripts/smoke-test-backend.js cpos",
     "build-backend:pos": "node scripts/build-backend.js pos",
     "build-backend:cpos": "node scripts/build-backend.js cpos",
+    "dev:up": "node scripts/dev-up.js",
+    "dev:down": "node scripts/dev-down.js",
+    "dev:updates": "node scripts/serve-updates.js",
 
     "pos": "node scripts/zota.js run pos",
     "cpos": "node scripts/zota.js run cpos",

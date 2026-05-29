@@ -1,0 +1,7 @@
+# Used by electron-updater when the app runs unpackaged (dev / npm run pos).
+# Points the updater at the local server started by scripts/serve-updates.js,
+# so the auto-update flow can be exercised end-to-end without publishing to
+# GitHub. Has no effect in packaged builds — those use electron-builder.json's
+# publish config (per-client GitHub releases repo).
+provider: generic
+url: http://localhost:8765

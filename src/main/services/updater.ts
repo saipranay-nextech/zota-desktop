@@ -4,6 +4,45 @@ import { UpdateProgress, UpdateInfo } from '../../shared/types';
 import { IPC_CHANNELS } from '../../shared/constants';
 import { BUILD_TIME_UPDATE_TOKEN } from '../build-token';
 
+// ------------------------------------------------------------
+// Patch electron-updater's GitHubProvider so it works with private repos.
+//
+// In electron-updater 6.x, GitHubProvider.getLatestTagName intentionally
+// hits the HTML route github.com/{owner}/{repo}/releases/latest (rather
+// than api.github.com) to dodge rate limits. That route returns 404 on
+// every private repo, regardless of whether the request is authenticated
+// — verified against the test repo with a full-scope token. The result
+// is that every "Check for Updates" against a private update repo fails
+// with ERR_UPDATER_LATEST_VERSION_NOT_FOUND, even though the release
+// exists and the token has access.
+//
+// This monkey-patch routes the request through api.github.com instead.
+// The api endpoint honors the Authorization header set by autoUpdater
+// .requestHeaders (where we put BUILD_TIME_UPDATE_TOKEN), so private
+// repos resolve correctly. GitHub Enterprise hosts fall through to the
+// original implementation because they already use the API path.
+// ------------------------------------------------------------
+const GitHubProviderModule = require('electron-updater/out/providers/GitHubProvider');
+const GitHubProvider = GitHubProviderModule.GitHubProvider;
+const originalGetLatestTagName = GitHubProvider.prototype.getLatestTagName;
+GitHubProvider.prototype.getLatestTagName = async function (cancellationToken: unknown) {
+  const opts = this.options;
+  // Custom hosts (Enterprise) already use the API endpoint upstream.
+  if (opts.host != null && opts.host !== 'github.com') {
+    return originalGetLatestTagName.call(this, cancellationToken);
+  }
+  const apiUrl = new URL(`https://api.github.com/repos/${opts.owner}/${opts.repo}/releases/latest`);
+  try {
+    const rawData = await this.httpRequest(apiUrl, { Accept: 'application/json' }, cancellationToken);
+    if (rawData == null) return null;
+    return JSON.parse(rawData).tag_name;
+  } catch (e: any) {
+    throw new Error(
+      `Unable to find latest version on GitHub (${apiUrl}): ${e.stack || e.message}`
+    );
+  }
+};
+
 class UpdaterService {
   private targetWindow: BrowserWindow | null = null;
   private mainWindow: BrowserWindow | null = null;

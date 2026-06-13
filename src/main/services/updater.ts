@@ -7,27 +7,41 @@ import { BUILD_TIME_UPDATE_TOKEN } from '../build-token';
 // ------------------------------------------------------------
 // Patch electron-updater's GitHubProvider so it works with private repos.
 //
-// In electron-updater 6.x, GitHubProvider.getLatestTagName intentionally
-// hits the HTML route github.com/{owner}/{repo}/releases/latest (rather
-// than api.github.com) to dodge rate limits. That route returns 404 on
-// every private repo, regardless of whether the request is authenticated
-// — verified against the test repo with a full-scope token. The result
-// is that every "Check for Updates" against a private update repo fails
-// with ERR_UPDATER_LATEST_VERSION_NOT_FOUND, even though the release
-// exists and the token has access.
+// In electron-updater 6.x, GitHubProvider uses github.com HTML routes
+// throughout (both /releases/latest for the version check and
+// /releases/download/{tag}/{file} for asset downloads) "to avoid API
+// rate limits" per the upstream code comment. Those HTML routes return
+// 404 on every private repo regardless of authentication — verified
+// against the test repo with a full-scope token. Result: "Check for
+// Updates" against any private update repo throws either
+// ERR_UPDATER_LATEST_VERSION_NOT_FOUND or
+// ERR_UPDATER_CHANNEL_FILE_NOT_FOUND, even though the release exists
+// and the token has access.
 //
-// This monkey-patch routes the request through api.github.com instead.
-// The api endpoint honors the Authorization header set by autoUpdater
-// .requestHeaders (where we put BUILD_TIME_UPDATE_TOKEN), so private
-// repos resolve correctly. GitHub Enterprise hosts fall through to the
-// original implementation because they already use the API path.
+// This monkey-patch routes everything through api.github.com:
+//   1. getLatestTagName fetches the release via API and caches the
+//      asset URL map on the provider instance.
+//   2. getBaseDownloadPath returns the cached absolute API asset URL
+//      when one exists for the requested filename. URL constructor
+//      treats absolute URLs as-is, so the base github.com host is
+//      effectively bypassed.
+//   3. createRequestOptions adds Accept: application/octet-stream for
+//      api.github.com asset URLs so GitHub responds with a 302 to the
+//      signed download URL (the executor follows the redirect, strips
+//      auth on the cross-domain hop, and pulls the actual bytes).
+//
+// GitHub Enterprise hosts fall through to the original implementation
+// because they already use the API path correctly upstream.
 // ------------------------------------------------------------
 const GitHubProviderModule = require('electron-updater/out/providers/GitHubProvider');
 const GitHubProvider = GitHubProviderModule.GitHubProvider;
+
 const originalGetLatestTagName = GitHubProvider.prototype.getLatestTagName;
+const originalGetBaseDownloadPath = GitHubProvider.prototype.getBaseDownloadPath;
+const originalCreateRequestOptions = GitHubProvider.prototype.createRequestOptions;
+
 GitHubProvider.prototype.getLatestTagName = async function (cancellationToken: unknown) {
   const opts = this.options;
-  // Custom hosts (Enterprise) already use the API endpoint upstream.
   if (opts.host != null && opts.host !== 'github.com') {
     return originalGetLatestTagName.call(this, cancellationToken);
   }
@@ -35,12 +49,44 @@ GitHubProvider.prototype.getLatestTagName = async function (cancellationToken: u
   try {
     const rawData = await this.httpRequest(apiUrl, { Accept: 'application/json' }, cancellationToken);
     if (rawData == null) return null;
-    return JSON.parse(rawData).tag_name;
+    const release = JSON.parse(rawData);
+    // Cache the API asset URLs by filename so getBaseDownloadPath can
+    // serve absolute URLs for latest.yml, the installer, and blockmap.
+    const map: Record<string, string> = {};
+    for (const asset of release.assets || []) {
+      map[asset.name] = asset.url;
+    }
+    this._privateAssetUrlMap = map;
+    return release.tag_name;
   } catch (e: any) {
     throw new Error(
       `Unable to find latest version on GitHub (${apiUrl}): ${e.stack || e.message}`
     );
   }
+};
+
+GitHubProvider.prototype.getBaseDownloadPath = function (tag: string, fileName: string) {
+  const map = this._privateAssetUrlMap;
+  if (map && map[fileName]) {
+    // Returning an absolute URL — newUrlFromBase (new URL(input, base))
+    // ignores the base when the input is absolute, so this effectively
+    // routes the request to api.github.com.
+    return map[fileName];
+  }
+  return originalGetBaseDownloadPath.call(this, tag, fileName);
+};
+
+GitHubProvider.prototype.createRequestOptions = function (url: URL, headers?: Record<string, string>) {
+  // For api.github.com asset URLs, add Accept: application/octet-stream
+  // so GitHub serves the file bytes (via 302 redirect to a signed S3
+  // URL) instead of the JSON asset metadata.
+  const isApiAssetUrl =
+    url && url.host === 'api.github.com' && url.pathname.includes('/releases/assets/');
+  if (isApiAssetUrl) {
+    const merged = { ...(headers || {}), Accept: 'application/octet-stream' };
+    return originalCreateRequestOptions.call(this, url, merged);
+  }
+  return originalCreateRequestOptions.call(this, url, headers);
 };
 
 class UpdaterService {
